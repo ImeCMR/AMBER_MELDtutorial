@@ -1,0 +1,45 @@
+# MELD restraints, written by gen_restraints.py
+# topology  : ../1_system_setup/3gb1_HMR.prmtop
+# structure : ss.dat
+# parameters: meld_params.in
+# residues  : ss 1-56  ->  prmtop 2-57   (ACE at 1, NHE at 58)
+#
+# DISANG    : restraints.disang
+# index     : restraints.indxf
+# The two files describe the same restraints and must be used together.
+
+MELD 3
+
+UNITS  meld
+
+INFO    off                              # on -> each replica writes meld.info.<rank>
+
+# ADAPT is a switch by PRESENCE. Comment the next line out (or delete it) and the
+# alpha ladder never moves, which is pmemd's own default. There is no "ADAPT off":
+# the keyword always switches adaptation on and always wants all five numbers.
+ADAPT   2.0 50 50 -1 0.02                # growth burn_in every stop_after min_acc
+
+TSCALE  0.0 0.3  300.0 550.0  "geometric"   # GeometricTemperatureScaler(0, 0.3, 300, 450)
+
+SCALER  ss                       "constant"       # SS holds full strength all the way up
+SCALER  prot  0.4 1.0 4.0        "nonlinear"      # nonlinear, alpha_min 0.4, alpha_max 1.0, factor 4
+RAMP    warmup 1 200 1e-3 1 4.0  "nonlinear_ramp" # restraints fade in over 200 exchange steps
+
+# secondary structure: helix and extended windows, 6 phi/psi torsions + 3 CA-CA distances each
+# 28 groups, 252 restraints
+COLL SS  ACTIVE 85%  KEEP all  SCALER ss  RAMP warmup  K distance 2500 torsion 0.025  GROUPS 9 x 28
+
+# strand pairing: N-O and O-N per residue pair, keep either
+# 213 groups, 426 restraints
+COLL SP  ACTIVE 10  KEEP 1  SCALER prot  RAMP warmup  K distance 250  GROUPS 2 x 213
+
+# hydrophobic contacts: every side-chain atom pair, keep one
+# 121 groups, 2471 restraints
+COLLECTION HY  ACTIVE 21  KEEP 1  SCALER prot  RAMP warmup  K distance 250
+  GROUPS 25 10 20 10 x 3 20 40 10 20 55 10 40 20 25 10 20 10 x 3 20 40 10 20
+  GROUPS 55 10 40 20 10 20 10 x 3 20 40 10 20 55 10 40 20 10 20 10 x 3 20 40
+  GROUPS 10 20 55 10 40 20 10 20 10 x 3 20 40 10 20 55 10 40 20 8 16 4
+  GROUPS 8 22 4 16 8 16 32 8 16 44 8 32 16 x 2 4 8 22 4 16 8 4
+  GROUPS 8 22 4 16 8 4 8 22 4 16 8 16 44 8 32 16 32 88 16 64
+  GROUPS 32 22 4 16 8 x 2 32 16 88 44
+END
