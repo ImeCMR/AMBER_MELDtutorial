@@ -1,0 +1,130 @@
+# ==========================================================================
+#  MELD restraint parameters -- template written by gen_restraints.py
+#
+#      gen_restraints.py ss.dat -i this_file
+#
+#  Anything left out falls back to the defaults compiled into the script.
+#
+#  FORCE CONSTANT UNITS.  The values below are in MELD's own units, exactly
+#  as the python MELD (maccallumlab/meld) quotes them:
+#
+#      distance          kJ/mol/nm^2
+#      torsion, angle    kJ/mol/deg^2
+#
+#  The generated index file carries a 'UNITS meld' record, so pmemd converts
+#  them per restraint type on the way in:
+#
+#      rk2 [kcal/mol/A^2  ] = k [kJ/mol/nm^2 ] * 0.5/4.184/100        = k * 1.1950287e-3
+#      rk2 [kcal/mol/rad^2] = k [kJ/mol/deg^2] * 0.5/4.184*(180/pi)^2 = k * 392.30477
+#
+#  The two factors differ by five orders of magnitude, which is why a
+#  collection holding both kinds -- SS is one -- states them separately.
+#
+#  Distances are in nm here and are written to DISANG in Angstrom.
+#
+#  A count ('active') may be written as 'all', an integer, a fraction (0.45)
+#  or a percentage (45%).
+# ==========================================================================
+
+# ---- system ------------------------------------------------------------
+# How the H/E/. string lines up with the topology.
+#
+# The ss string covers the PROTEIN residues only -- one character per
+# residue of the sequence you folded, and NOTHING for a terminal cap.
+# 'auto' skips leading caps (ACE, FOR, NME, NHE, NH2, OHE), so a capped
+# build lines itself up:
+#
+#    capped    prmtop:  1 ACE   2 MET   3 THR  ...  57 GLU   58 NHE
+#              ss.dat:          .       E      ...  .
+#                               ^ ss position 1 = prmtop 2, so auto -> 2
+#
+#    uncapped  prmtop:  1 MET   2 THR  ...            auto -> 1
+#
+# Override with a number only when auto guesses wrong: a non-standard
+# residue at the N terminus, or an ss string describing part of a chain.
+# The run prints the mapping it used and the residues either side of it,
+# so check that line rather than trusting the guess.
+first_residue           = auto        # prmtop residue holding position 1 of the ss string; auto = first non-cap
+
+# ---- SS -- secondary structure (helix AND extended, one collection) ----
+# One group per 5-residue window: 6 phi/psi torsions + 3 CA-CA
+# distances, all of them kept (KEEP all), as parse.py builds them.
+ss_active               = 85%         # groups the collection keeps: reference int(len(groups)*0.85)
+ss_run_length           = 5           # residues per secondary structure window (parse.py uses 5)
+ss_min_match            = 4           # how many of those must carry the type (parse.py min_secondary_match)
+ss_k_distance           = 2500        # CA-CA force constant, kJ/mol/nm^2   -> 2.98757 kcal/mol/A^2
+ss_k_torsion            = 0.025       # phi/psi force constant, kJ/mol/deg^2 -> 9.80762 kcal/mol/rad^2
+ss_scaler               = ss          # a SCALER named in the ladder, or none
+ss_ramp                 = warmup      # a RAMP named in the ladder, or none
+
+# ---- SP -- strand pairing ----------------------------------------------
+# One group per residue pair across two strands, holding the N-O and
+# the O-N distance; either one satisfies the pair (KEEP 1).
+sp_active               = auto        # auto = sp_fraction x the number of residues marked E
+sp_fraction             = 0.45        # the reference's int(active*0.45)
+sp_min_strand_length    = 1           # ignore runs of E shorter than this
+sp_r2                   = 0           # N-O flat bottom start, nm
+sp_r3                   = 0.35        # N-O flat bottom end, nm
+sp_k                    = 250         # force constant, kJ/mol/nm^2 -> 0.298757 kcal/mol/A^2
+sp_scaler               = prot        # a SCALER named in the ladder, or none
+sp_ramp                 = warmup      # a RAMP named in the ladder, or none
+
+# ---- HY -- hydrophobic contacts ----------------------------------------
+# One group per hydrophobic residue pair, holding every side-chain
+# atom pair; any one contact satisfies the pair (KEEP 1).
+hy_active               = auto        # auto = hy_contacts_per_residue x the hydrophobic residue count
+hy_contacts_per_residue = 1.2         # the reference's int(1.2*n_hydrophobic)
+hy_min_sep              = 7           # minimum separation in sequence between paired residues
+hy_r2                   = 0           # contact flat bottom start, nm
+hy_r3                   = 0.5         # contact flat bottom end, nm
+hy_k                    = 250         # force constant, kJ/mol/nm^2 -> 0.298757 kcal/mol/A^2
+hy_scaler               = prot        # a SCALER named in the ladder, or none
+hy_ramp                 = warmup      # a RAMP named in the ladder, or none
+
+# ---- shared restraint shape --------------------------------------------
+quadratic_cut           = 0.2         # distances turn linear this far past r3, nm (parse.py quadratic_cut)
+
+
+# ==========================================================================
+#  THE ALPHA LADDER
+#
+#  Everything between LADDER and END_LADDER is copied into the .indxf file
+#  verbatim, so it is plain MELD v3 index syntax: anything the pmemd reader
+#  accepts can go here.
+#
+#      alpha            = (rung - 1)/(nrep - 1), from the -ng group position
+#      force constant   = base_k x SCALER(alpha) x RAMP(exchange step)
+#      bath temperature = TSCALE(alpha), which replaces temp0 from mdin
+#
+#  A ladder clamps outside the alpha range it covers, so one TSCALE record is
+#  exactly the reference's single GeometricTemperatureScaler.  Several TSCALE
+#  records make a piecewise ladder; they must tile their range with no gap and
+#  no overlap.  The type comes last and is usually quoted:
+#
+#      SCALER <name>  [params]  "constant|linear|geometric|nonlinear|
+#                                plateau|plateausmooth|plateaunonlinear"
+#      RAMP   <name>  [params]  "constant_ramp|linear_ramp|nonlinear_ramp|
+#                                ramp_switcher"
+#      TSCALE a_min a_max t_min t_max  "constant|linear|geometric"
+#      ADAPT  growth burn_in every stop_after min_acc
+#             (present = adaptation ON, absent = OFF; there is no 'ADAPT off')
+#      INFO   on|off
+#
+#  Only those keywords belong here -- the collections themselves are built
+#  from the secondary structure file.
+# ==========================================================================
+
+LADDER
+  INFO    off                              # on -> each replica writes meld.info.<rank>
+
+  # ADAPT is a switch by PRESENCE. Comment the next line out (or delete it) and the
+  # alpha ladder never moves, which is pmemd's own default. There is no "ADAPT off":
+  # the keyword always switches adaptation on and always wants all five numbers.
+  ADAPT   2.0 50 50 -1 0.02                # growth burn_in every stop_after min_acc
+
+  TSCALE  0.0 0.3  300.0 550.0  "geometric"   # GeometricTemperatureScaler(0, 0.3, 300, 450)
+
+  SCALER  ss                       "constant"       # SS holds full strength all the way up
+  SCALER  prot  0.4 1.0 4.0        "nonlinear"      # nonlinear, alpha_min 0.4, alpha_max 1.0, factor 4
+  RAMP    warmup 1 200 1e-3 1 4.0  "nonlinear_ramp" # restraints fade in over 200 exchange steps
+END_LADDER
