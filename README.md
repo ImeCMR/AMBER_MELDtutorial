@@ -12,7 +12,7 @@ MELD (Modeling Employing Limited Data) tackles this by combining physics with ex
 <iframe
   width="640"
   height="480"
-  src="https://molstar.org/view.html?structure=3+GB1"
+  src="https://arose.github.io/ngl/?name=3GB1"
   title="3GB1 structure"
   style="border:0;">
 </iframe>
