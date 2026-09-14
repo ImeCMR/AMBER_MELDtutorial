@@ -81,7 +81,7 @@ The Coarse Physical Insights introduced above are, in practice, primarily 3 coll
 
 The secondary structure prediction is obtained from the sequence alone, using the [PSIPRED](https://bioinf.cs.ucl.ac.uk/psipred/) server at UCL. Provided the sequence, the server returns per-residue assignment of helix, strand or coil `(H/E/.)` together with a confidence score for each. Reference file [ss.dat](2_meld_remd/ss.dat) contains this structural information for 3GB1.
 
-![PSIPRED chart Preview](.assets/psipredChart.svg)
+![PSIPRED chart Preview](.assets/psipredChart.jpg)
 
 #### 2.2. generate replica input files
 
