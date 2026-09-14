@@ -719,7 +719,7 @@ def write_indxf(filename, collections, ladder_lines, header_lines):
     with open(filename, "w") as fh:
         for line in header_lines:
             fh.write(f"# {line}\n" if line else "#\n")
-        fh.write("\nMELD 3\n\n")
+        fh.write("\nMELD 3\n\n") # REMOVE LATER --  MELD 3 is just new format (read in meld_wrapper.F90)
         # The force constants on the COLL records below are MELD's own units;
         # pmemd converts them per restraint type.
         fh.write("UNITS  meld\n\n")
