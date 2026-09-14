@@ -1,0 +1,4 @@
+parm 3gb1.prmtop
+hmassrepartition
+outparm 3gb1_HMR.prmtop
+quit
