@@ -1,0 +1,15 @@
+Replica Exchange MELD (200 ns)
+ &cntrl
+   irest=0, ntx=1, 
+   nstlim=12500, dt=0.004, numexchg=4000,   ! 50ps blocks * 4000 = 200ns
+   ntt=3, gamma_ln=2.0,                     ! Use Langevin dynamics with the collision frequency 2.0/ps (implicit solvent)
+   temp0=XXXXX, ig=RANDOM_NUMBER,
+   ntc=2, ntf=2,                            ! SHAKE applied to H 
+   ntb=0, igb=5,                            ! implicit solvent
+   cut=999.0, rgbmax=999.0,
+   ntpr=500, ntwx=500, ntwr=12500,          ! save information every 2ps & save restart after each exchange black
+   nmropt=1, meld=1, indxf='restraints.indxf',   ! MELD flags 
+ /
+ &wt TYPE='END'
+ /
+DISANG=restraints.disang
