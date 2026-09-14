@@ -13,82 +13,48 @@ MELD (Modeling Employing Limited Data) tackles this by combining physics with ex
 
 In this tutorial you will fold the B1 domain of protein G (PDB: 3GB1) starting from its sequence. You will build the system with `tleap` (ff19SB, implicit solvent) and minimize it, generate CPI restraints, run an H,T-REMD MELD simulation in parallel across GPUs, and analyze the resulting trajectories to identify the folded state as a dominant, low-energy population.
 
-**Assumptions**: This tutorial assumes that you have experience building systems using ```tleap```, running MD simulations in parallel with ```pmemd.cuda.MPI```, knowledge on terminology and typical variables used for standard MD simulations in ```AMBER```, and ```MELD```. <br>If you are not familiar with setting up a system, equilibration and running MD simulations please refer to the more basic tutorials before attempting to run ```MELD``` simulations.
+**Assumptions**: This tutorial assumes that you have experience building systems using ```tleap```, running MD simulations in parallel with ```pmemd.cuda.MPI```, knowledge on terminology and typical variables used for standard MD simulations in ```AMBER```, and ```MELD```. <br>If you are not familiar with setting up a system, running MD simulations please refer to the more basic tutorials before attempting to run ```Replica Exchange MELD``` simulations.
 
+## Method
 
+### 1. System setup
 
-This repository has a tutorial on how to implement Replica Exchange MELD simulation in AMBER molecular dynamics software packag.
+This is the earliest stage where we create the topology and the initial coordinate file for the intended system 3GB1. Because MELD begins from an extended chain and lets the restraints and the force field guide the fold, the starting geometry carries no structural information.
 
-## 1. System setup
-
-In this section we will build the system via Leap and run minimization via Sander. Here a brief description of the system and the procedure used to generate the topology and coordinate files.
-
-For this tutorial we will generate structure of the 1UAO protein using the sequence FASTA file. Use following command to download the sequence.
+For this tutorial we will generate initial peptide chain using the sequence  alone. Use following command to download the FASTA entry for 3GB1 from the PDB.
 ```
 curl -o 3gb1.fasta https://www.rcsb.org/fasta/entry/3GB1
 ```
-Now lets bild the system to simulate using Leap. Here we will use ff19SB forcefield and mbondii2 radii that are appropriate for the igb=5 option in sander. We use [makeLeap.x](1_system_setup/makeLeap.x) to make the Leap input file ([leap.in](1_system_setup/leap.in)) using the [1uoa.fasta](1_system_setup/1uoa.fasta) file we downloaded before.
+<i>Note that we take only the sequence from this entry. The deposited coordinates are never read; they are reserved for the final validation step, where the folded ensemble is compared against the experimental structure.</i>
 
-* [makeLeap.x](1_system_setup/makeLeap.x)
-```
-#!/bin/bash
+The chain is then built with `tleap`. We use the `ff19SB` force field with `mbondi2` radii, which are the radii appropriate for the `igb=5` generalized Born model. Rather than writing the `tleap` input by hand, the helper script [makeLeap.x](1_system_setup/makeLeap.x) translates the one-letter FASTA sequence into the three-letter residue names that `tleap` expects.
 
-sequence=$(grep -v "^>" 1uoa.fasta | tr -d '\n')
-convert_aa() {
-    case $1 in
-        A) echo "ALA" ;;
-        C) echo "CYS" ;;
-        D) echo "ASP" ;;
-        E) echo "GLU" ;;
-        F) echo "PHE" ;;
-        G) echo "GLY" ;;
-        H) echo "HIS" ;;
-        I) echo "ILE" ;;
-        K) echo "LYS" ;;
-        L) echo "LEU" ;;
-        M) echo "MET" ;;
-        N) echo "ASN" ;;
-        P) echo "PRO" ;;
-        Q) echo "GLN" ;;
-        R) echo "ARG" ;;
-        S) echo "SER" ;;
-        T) echo "THR" ;;
-        V) echo "VAL" ;;
-        W) echo "TRP" ;;
-        Y) echo "TYR" ;;
-        *) echo "UNK" ;;
-    esac
-}
-
-three_letter_seq=""
-for (( i=0; i<${#sequence}; i++ )); do
-    aa="${sequence:$i:1}"
-    three_letter_seq="$three_letter_seq $(convert_aa $aa)"
-done
-
-# Create the leap.in file
-cat > leap.in << EOF
-source leaprc.protein.ff19SB
-set default PBradii mbondi2
-pro = sequence { ACE$three_letter_seq NHE }
-saveamberparm pro 1uoa.prmtop 1uoa.inpcrd
-quit
-EOF
-
-echo "leap.in file created successfully!"
-```
-Execute this with following commands for 3GB1 protein:
+Run [makeLeap.x](1_system_setup/makeLeap.x)  with the following commands for 3GB1:
 ```
 chmod +x makeLeap.x
 ./makeLeap.x -s 3gb1.fasta -o 3gb1 
 ```
-This will create [leap.in](1_system_setup/leap.in). Use command ```tleap -f leap.in 2> leap.log``` to run this with a log file. Carefully look for any Errors, Warnings in the log file. This creates [3gb1.prmtop](1_system_setup/3gb1.prmtop) and [3gb1.inpcrd](1_system_setup/3gb1.inpcrd).\\
-Here, we use  Hydrogen Mass Repartitioning ([HMR](https://pubs.acs.org/jctcce/article/11/4/1864/847792/Long-Time-Step-Molecular-Dynamics-through-Hydrogen)) to alow longer time step simulations. We can simply do this using built in *ParmED* package inside *AMBER*. Using ParmED input file [HMR.in](1_system_setup/HMR.in) create new topology file [3gb1_HMR.prmtop](1_system_setup/3gb1_HMR.prmtop).
+This writes [leap.in](1_system_setup/leap.in). Execute it, capturing the output so that nothing is missed:
+ ```
+ tleap -f leap.in 2> leap.log
+ ``` 
+ Read leap.log before continuing. Warnings about unperturbed charge for the built chain are ignored since implicit solvent simulation. However, any errors about unrecognized residues or missing parameters must be resolved at this stage because they will cause the system to be unrunnable later. A successful run produces [3gb1.prmtop](1_system_setup/3gb1.prmtop) and [3gb1.inpcrd](1_system_setup/3gb1.inpcrd).
+ 
+Next we apply Hydrogen Mass Repartitioning (HMR)<sup>[[3](https://doi.org/10.1021/ct5010406)]</sup>. HMR shifts mass from heavy atoms to the hydrogens bonded to them, slowing the fastest bond vibrations without changing the total mass or thermodynamics of the system. This allows a longer timestep of about 4 fs instead of the usual 2 fs. The repartitioning is handled by `ParmED`, which ships with AMBER, using the input file [HMR.in](1_system_setup/HMR.in):
+```
+parm 3gb1.prmtop
+hmassrepartition
+outparm 3gb1_HMR.prmtop
+quit
+```
+To execute simply use command:
 ```
 parmed -i HMR.in
 ```
-\\
-Next, we move on to minimization. Our main goal is to use MELD to guid our protein to fold into it's native structure by imposing some restrains we already know. Therefore, we do a simple minimization. [min.in](1_system_setup/min.in)
+This creates [3gb1_HMR.prmtop](1_system_setup/3gb1_HMR.prmtop), which is used for the remainder of the tutorial. Note that the coordinate file has not changed: only the masses have been redistributed.
+
+Lastly, we carry out a minimization. Since MELD is in charge of guiding the chain to its native fold, we are not attempting to pre-organise the structure in any way; our only requirement is to eliminate the steric clashes and strained geometries that tleap leaves behind when it assembles the chain from scratch, so that the initial steps of the dynamics do not fail. A brief minimisation in implicit solvent is enough.
+
 ```
 energy minimization
  &cntrl
@@ -98,6 +64,16 @@ energy minimization
   ntb = 0, igb = 5, saltcon = 0.0,
  /
  ```
+The above settings follow from implicit-solvent treatment. The flag `ntb = 0` removes periodic boundaries while `igb = 5` selects the generalized Born model, so there is no solvent box and no cutoff is needed (`cut = 999.0`, `rgbmax = 999.0`).
+
+Run the minimization using [min.in](1_system_setup/min.in):
+```
+srun $AMBERHOME/bin/pmemd -O -i min.in -p 3gb1_HMR.prmtop -c 3gb1.inpcrd -o min.out -r min.rst -inf min.info
+```
+Check min.out and confirm that the energy has decreased smoothly and converged, with no `NaN` values. The resulting [min.rst](1_system_setup/min.rst) is the coordinate file from which every replica of the MELD simulation will be launched, so it is worth inspecting visually before committing to the far more expensive stages ahead. What you should see is an extended, unfolded chain with clean bond geometry and no overlapping atoms.
+
+
 ## References
 1. MacCallum, J. L.; Perez, A.; Dill, K. A. Determining Protein Structures by Combining Semireliable Data with Atomistic Physical Models by Bayesian Inference. *Proc. Natl. Acad. Sci.* **2015**, 112 (22), 6985–6990. https://doi.org/10.1073/pnas.1506788112.
 2. Perez, A.; MacCallum, J. L.; Dill, K. A. Accelerating Molecular Simulations of Proteins Using Bayesian Inference on Weak Information. *Proc. Natl. Acad. Sci.* **2015**, 112 (38), 11846–11851. https://doi.org/10.1073/pnas.1515561112.
+3. Hopkins, C. W.; Le Grand, S.; Walker, R. C.; Roitberg, A. E. Long-Time-Step Molecular Dynamics through Hydrogen Mass Repartitioning. *J. Chem. Theory Comput.* **2015**, 11 (4), 1864–1874. https://doi.org/10.1021/ct5010406.
