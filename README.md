@@ -276,7 +276,6 @@ MELD 3
 UNITS  meld
 
 INFO    off
-ADAPT   2.0 50 50 -1 0.02
 TSCALE  0.0 0.3  300.0 550.0  "geometric"
 SCALER  ss                       "constant"
 SCALER  prot  0.4 1.0 4.0        "nonlinear"
