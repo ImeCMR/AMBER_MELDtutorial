@@ -17,7 +17,7 @@ INFO    off                              # on -> each replica writes meld.info.<
 # ADAPT is a switch by PRESENCE. Comment the next line out (or delete it) and the
 # alpha ladder never moves, which is pmemd's own default. There is no "ADAPT off":
 # the keyword always switches adaptation on and always wants all five numbers.
-ADAPT   2.0 50 50 -1 0.02                # growth burn_in every stop_after min_acc
+# ADAPT   2.0 50 50 -1 0.02                # growth burn_in every stop_after min_acc
 
 TSCALE  0.0 0.3  300.0 550.0  "geometric"   # GeometricTemperatureScaler(0, 0.3, 300, 450)
 
