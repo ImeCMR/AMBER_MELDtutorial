@@ -922,8 +922,7 @@ def parse_args(argv=None):
         description="Build the DISANG and MELD index files for a MELD run in pmemd. "
                     "Defaults live at the top of this script; --write-params dumps "
                     "them as an annotated file you can edit and pass back with -i.")
-    p.add_argument("ss", nargs="?", required=True,
-                   help="secondary structure file: combination of \"H\", \"E\", \".\" per residue")
+    p.add_argument("ss", help="secondary structure file: combination of \"H\", \"E\", \".\" per residue")
     p.add_argument("-p", "--prmtop", required=True,
                    help="AMBER topology (required)")
     p.add_argument("-o", "--output", default="restraints",
