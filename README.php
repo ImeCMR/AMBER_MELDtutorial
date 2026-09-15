@@ -878,7 +878,7 @@ DISANG=restraints.disang</pre>
 </ol>
 
 <footer>
-    by Imesh Ranaweera, Namindu Rangana and Binod Perera<br>
+    by Namindu Rangana, Imesh Ranaweera, and Binod Perera<br>
     All materials copyrighted by authors. &copy; <?php echo date("Y"); ?>
 </footer>
 
